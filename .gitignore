@@ -1,2 +1,4 @@
 db.sqlite3
 MTGInventory/settings.py
+MTGInventory/__pycache__
+Inventory/__pycache__
