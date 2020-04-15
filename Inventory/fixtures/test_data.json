@@ -1,0 +1,24 @@
+[
+  {
+    "model": "Inventory.Card",
+    "pk": 1,
+    "fields": {
+      "name": "Card Number One",
+      "edition": "First Edition",
+      "foil": false,
+      "quantity": 1,
+      "bag": 1
+    }
+  },
+  {
+    "model": "Inventory.Card",
+    "pk": 2,
+    "fields": {
+      "name": "Card Number Two",
+      "edition": "First Edition",
+      "foil": false,
+      "quantity": 3,
+      "bag": 2
+    }
+  }
+]
