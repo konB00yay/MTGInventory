@@ -1,0 +1,12 @@
+#card_button{
+    float: right;
+    margin: 3;
+}
+.form_holder{
+    display: flex;
+    align-items: center;
+    margin-left: 28%;
+}
+.upload_label{
+    font-size: 24;
+}

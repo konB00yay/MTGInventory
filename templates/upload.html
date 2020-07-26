@@ -1,11 +1,16 @@
+{% load render_table from django_tables2 %}
 {% load bootstrap3 %}
 {% bootstrap_css %}
+{% load static %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="{% static 'upload.css' %}" />
 </head>
 <body>
+    <a class="btn btn-default" id="card_button" href="{% url 'card' %}">Inventory</a>
     {% if messages %}
         {% for message in messages %}
             <div>
@@ -14,21 +19,16 @@
             </div>
         {% endfor %}
     {% else %}
-    {{order}}
+    <div class="form_holder">
     <form action="" method="POST" enctype="multipart/form-data">
         {% csrf_token %}
-        <label for="file1"> Upload Cards: </label>
-        <input type="file" id="file1" name="upload">
-        <small>Only accepts CSV files</small>
-        <button type="submit" class="btn btn-primary">Upload</button>
-    </form>
-    <form action="" method="POST" enctype="multipart/form-data">
-        {% csrf_token %}
-        <label for="file2"> Delete Cards: </label>
+        <label class="upload_label" for="file2"> Delete Cards: </label>
         <input type="file" id="file2" name="delete">
         <small>Only accepts CSV files</small>
         <button type="submit" class="btn btn-primary">Delete</button>
     </form>
+    </div>
     {% endif %}
+    {% render_table table %}
 </body>
 </html>

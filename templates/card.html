@@ -1,18 +1,28 @@
 {% load render_table from django_tables2 %}
 {% load bootstrap3 %}
 {% bootstrap_css %}
+{% load static %}
 <html>
     <head>
         <title>MTGInventory</title>
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="{% static 'card.css' %}" />
     </head>
     <body>
         {% if filter %}
-        <form action="" method="get" class="form form-inline">
+        <form action="" method="get" class="form form-inline" style="position: absolute; margin: 3">
             {% bootstrap_form filter.form layout='inline' %}
             {% bootstrap_button 'filter' %}
         </form>
         {% endif %}
+        <form action="" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label class="upload_label" for="file1"> Upload Cards: </label>
+            <input type="file" id="file1" name="upload">
+            <small>Only accepts CSV files</small>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+        <a class="btn btn-default" id="upload_button" href="{% url 'upload' %}">Upload</a>
         {% render_table table %}
     </body>
 </html>
