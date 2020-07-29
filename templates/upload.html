@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="{% static 'upload.css' %}" />
 </head>
 <body>
-    <a class="btn btn-default" id="card_button" href="{% url 'card' %}">Inventory</a>
     {% if messages %}
         {% for message in messages %}
             <div>
@@ -19,16 +18,22 @@
             </div>
         {% endfor %}
     {% else %}
-    <div class="form_holder">
-    <form action="" method="POST" enctype="multipart/form-data">
-        {% csrf_token %}
-        <label class="upload_label" for="file2"> Delete Cards: </label>
-        <input type="file" id="file2" name="delete">
-        <small>Only accepts CSV files</small>
-        <button type="submit" class="btn btn-primary">Delete</button>
-    </form>
+    <div class="sold_table_header">
+        <a class="btn btn-default" id="card_button" href="{% url 'card' %}">Inventory</a>
+        <div class="form_holder">
+            <form action="" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <label class="upload_label" for="file2"> Delete Cards: </label>
+                <input type="file" id="file2" name="delete">
+                <small>Only accepts CSV files</small>
+                <button type="submit" class="btn btn-primary">Delete</button>
+            </form>
+        </div>
+        {% endif %}
+        <div class="profit_holder">
+            Total Income: {{total}}
+        </div>
     </div>
-    {% endif %}
     {% render_table table %}
 </body>
 </html>

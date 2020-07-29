@@ -27,17 +27,19 @@ class CardTableView(SingleTableMixin, FilterView):
     template_name = 'card.html'
     filterset_class = CardFilter
 
-    def post(self, request):
-        # declaring template
+    def get(self, request):
         template = 'card.html'
         data = Card.objects.all()
         # prompt is a context variable that can have different values      depending on their context
         prompt = {
             'order': 'name, edition, foil, quantity, bag',
-            'profiles': data
+            'table': data
         }
-        if request.method == "GET":
-            return render(request, template, prompt)
+        return render(request, template, prompt)
+
+    def post(self, request):
+        # declaring template
+        template = 'card.html'
         csv_file = request.FILES.get('upload')
 
         if csv_file is not None:
@@ -64,19 +66,27 @@ class SoldTableView(SingleTableMixin, FilterView):
     table_class = SoldTable
     template_name = 'upload.html'
 
+    def get(self, request):
+        template = 'upload.html'
+        data = Sold.objects.all()
+        total_profit = 0
+        for sold in data:
+            total_profit += sold.profit
+
+        print(total_profit)
+        prompt = {
+            'order': 'name, edition, foil, quantity, profit',
+            'table': data,
+            'total': total_profit
+        }
+        return render(request, template, prompt)
+
     def post(self, request):
         # declaring template
         template = 'upload.html'
         data = Sold.objects.all()
-        # prompt is a context variable that can have different values      depending on their context
-        prompt = {
-            'order': 'name, edition, foil, quantity, profit',
-            'profiles': data
-        }
+        total_profit = 0
         context = {}
-
-        if request.method == "GET":
-            return render(request, template, prompt)
         delete_csv_file = request.FILES.get('delete')
 
         if delete_csv_file is not None:
@@ -107,5 +117,6 @@ class SoldTableView(SingleTableMixin, FilterView):
                         quantity=column[3],
                         profit=column[5]
                     )
-        context = {'tables': Sold.objects.all()}
+                    total_profit += column[5]
+        context = {'table': Sold.objects.all(), 'total': total_profit}
         return render(request, template, context)
