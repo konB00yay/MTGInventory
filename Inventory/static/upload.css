@@ -1,4 +1,4 @@
-#card_button{
+#card_button,#market_button{
     float: right;
     margin: 3;
 }

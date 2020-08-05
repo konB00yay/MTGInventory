@@ -20,6 +20,7 @@
     {% else %}
     <div class="sold_table_header">
         <a class="btn btn-default" id="card_button" href="{% url 'card' %}">Inventory</a>
+        <a class="btn btn-default" id="market_button" href="{% url 'market' %}">Market</a>
         <div class="form_holder">
             <form action="" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}

@@ -1,0 +1,16 @@
+#upload_button,#card_button {
+    position: relative;
+    float: right;
+    margin: 3;
+}
+#analyze_button {
+    margin: 3;
+    position: absolute;
+    margin-left: 47%;
+    margin-top: 6%;
+}
+#header {
+    position: absolute;
+    align-self: center;
+    margin-left: 40%;
+    }
