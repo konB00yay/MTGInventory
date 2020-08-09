@@ -13,4 +13,34 @@
     position: absolute;
     align-self: center;
     margin-left: 40%;
-    }
+}
+.holder{
+    height: 33%;
+    position: relative;
+}
+.market_table_header{
+    position: relative;
+}
+.table-container{
+    position: relative;
+    display: grid;
+    width: 100%;
+}
+table, th, td {
+  border: 1px solid black;
+}
+td{
+  padding: 5px;
+}
+table {
+  width: 100%;
+}
+
+th {
+  height: 50px;
+  text-align: center;
+  background-color: #FFD464;
+  color: white;
+}
+tr:hover {background-color: #f5f5f5;}
+tr:nth-child(even) {background-color: #f2f2f2;}

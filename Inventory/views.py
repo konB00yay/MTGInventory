@@ -4,6 +4,7 @@ import re
 
 import requests
 from bs4 import BeautifulSoup
+from itertools import chain
 from django.contrib import messages
 from django.db.models import F
 from django.shortcuts import render
@@ -18,6 +19,7 @@ from .tables import CardTable, SoldTable
 
 class SetCodes:
     SET_KEYS = {}
+    SET_NAMES = {}
     URL = "https://mtg.gamepedia.com/Template:List_of_Magic_sets"
     page = requests.get(URL)
     soup = BeautifulSoup(page.content, 'html.parser')
@@ -29,7 +31,7 @@ class SetCodes:
         set_abbrev = re.sub("[\(\[].*?[\)\]]", "", row_values[3].text).rstrip()
         if set_abbrev != '':
             SET_KEYS[set_abbrev] = set_name
-
+            SET_NAMES[set_name] = set_abbrev
 
 class CardFilter(FilterSet):
     class Meta:
@@ -72,8 +74,8 @@ class CardTableView(SingleTableMixin, FilterView):
                 name = (column[0].replace(';', ','))
                 edition = column[1]
                 foil = column[2]
-                bag = column[3]
-                quantity = column[4]
+                quantity = column[3]
+                bag = column[4]
                 card_id = name + '_' + edition + '_' + foil
                 bag_id = card_id + '_' + bag
                 _, created = Card.objects.update_or_create(
@@ -83,10 +85,10 @@ class CardTableView(SingleTableMixin, FilterView):
                     foil=foil
                 )
                 bags = Bag.objects.filter(bag_id=bag_id)
-                if bags.count == 0:
+                if bags.count() == 0:
                     Bag.objects.update_or_create(
                         bag_id=bag_id,
-                        id=card_id,
+                        card=_,
                         bag_number=bag,
                         quantity=quantity
                     )
@@ -139,13 +141,13 @@ class SoldTableView(SingleTableMixin, FilterView):
                 quantity = column[3]
                 card_id = name + '_' + edition + '_' + foil
                 card = Card.objects.filter(id=card_id)
-                card_bag = Bag.objects.filter(card_id=card_id)
+                card_bag = Bag.objects.filter(card__id=card_id)
                 if card_bag.count() > 0 and card.count() > 0:
                     selected_card_bag = card_bag[0]
                     selected_card = card[0]
                     if selected_card_bag.quantity <= int(quantity):
                         selected_card_bag.delete()
-                        selected_card.delete()
+                        #selected_card.delete()
                     else:
                         selected_card_bag.quantity = F('quantity') - column[3]
                         selected_card_bag.save()
@@ -161,33 +163,46 @@ class SoldTableView(SingleTableMixin, FilterView):
 
 class MarketAnalysis(TemplateView):
     template_name = 'market.html'
+    market = {}
 
     def get(self, request):
         template = 'market.html'
-        return render(request, template, {})
+        return render(request, template, {'market_dict': MarketAnalysis.market})
 
     def post(self, request):
         URL = "https://cardkingdom.com/purchasing/mtg_singles?filter%5Bipp%5D=100&filter%5Bsort%5D=name&filter%5Bnonfoil%5D=1&filter%5Bfoil%5D=1"
         page = requests.get(URL)
         soup = BeautifulSoup(page.content, 'html.parser')
-        cards = soup.find_all('div', class_='itemContentWrapper')
-        for card in cards:
-            card_name = card.find('span', class_='productDetailTitle').text
-            card_edition = card.find('div', class_='productDetailSet').find('a').text
-            card_foil = card.find('div', class_='foil') is not None
-            card_profit_dollar = float(card.find('span', class_='sellDollarAmount').text)
-            card_profit_cents = float(card.find('span', class_='sellCentsAmount').text) / 100
-            card_profit = card_profit_dollar + card_profit_cents
+        bags = []
         # pages = soup.find('ul', class_='pagination').find_all('a')
         # page_list = list(range(1, int(pages[len(pages) - 1].text) + 1))
-        # for p in page_list:
-        #     page_url = 'https://cardkingdom.com/purchasing/mtg_singles?filter%%5Bipp%%5D=100&filter%%5Bsort%%5D=name&filter%%5Bnonfoil%%5D=1&filter%%5Bfoil%%5D=1&page=%s' %(p)
-        #     print(page_url)
-        #     next_page = requests.get(page_url)
-        #     soup = BeautifulSoup(next_page.content, 'html.parser')
-        #     cards = soup.find_all('div', class_='itemContentWrapper')
-        #     for card in cards:
-        #         card_name = card.find('span', class_='productDetailTitle').text
-        #         card_edition = card.find('div', class_='productDetailSet').find('a').text
+        page_list = [1, 2]
+        for p in page_list:
+            cur_loop = {}
+            page_url = 'https://cardkingdom.com/purchasing/mtg_singles?filter%%5Bipp%%5D=100&filter%%5Bsort%%5D=name&filter%%5Bnonfoil%%5D=1&filter%%5Bfoil%%5D=1&page=%s' %(p)
+            next_page = requests.get(page_url)
+            soup = BeautifulSoup(next_page.content, 'html.parser')
+            cards = soup.find_all('div', class_='itemContentWrapper')
+            for card in cards:
+                card_name = re.sub("[\(\[].*?[\)\]]", "", card.find('span', class_='productDetailTitle').text).rstrip()
+                card_edition = re.sub("[\(\[].*?[\)\]]", "",
+                                      card.find('div', class_='productDetailSet').find('a').text).rstrip()
+                card_foil = card.find('div', class_='foil') is not None
+                if "FOIL" in card_edition:
+                    card_foil = 'true'
+                    card_edition = card_edition.replace('FOIL', '').rstrip()
+                card_edition_key = card_edition
+                if card_edition in SetCodes.SET_NAMES.keys():
+                    card_edition_key = SetCodes.SET_NAMES[card_edition]
+                card_profit_dollar = float(card.find('span', class_='sellDollarAmount').text)
+                card_profit_cents = float(card.find('span', class_='sellCentsAmount').text) / 100
+                card_profit = card_profit_dollar + card_profit_cents
+                card_id = card_name + '_' + card_edition_key + '_' + str(int(card_foil == 'true'))
+                cur_loop[card_id] = card_profit
+                MarketAnalysis.market[card_id] = card_profit
+            market_list = list(chain(Bag.objects.filter(card__id__in=list(cur_loop.keys()))))
+            if len(market_list) > 0:
+                bags.append(market_list)
+        print(bags)
         template = 'market.html'
-        return render(request, template, {})
+        return render(request, template, {'market_dict': MarketAnalysis.market})

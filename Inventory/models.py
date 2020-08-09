@@ -18,9 +18,14 @@ class Sold(models.Model):
 
 class Bag(models.Model):
     bag_id = models.CharField(max_length=150, primary_key=True, editable=False)
-    id = models.CharField(max_length=100, editable=False)
+    card = models.ForeignKey(Card, on_delete=models.CASCADE)
     bag_number = models.IntegerField(blank=False)
     quantity = models.IntegerField(blank=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['card'])
+        ]
 
 
 class MarketEvaluation(models.Model):
