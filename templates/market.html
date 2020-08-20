@@ -14,22 +14,29 @@
         <h1 id="header">Market Analysis</h1>
         <form action="" method="POST" enctype="multipart/form-data">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary" id="analyze_button">Analyze</button>
+            <button type="submit" class="btn btn-primary" id="analyze_button" name="gather_market_data">Gather Market Data</button>
+            <button type="submit" class="btn btn-primary" id="apply_button" name="apply_market_data">Apply Data</button>
         </form>
         <a class="btn btn-default" id="upload_button" href="{% url 'upload' %}">Sell</a>
         <a class="btn btn-default" id="card_button" href="{% url 'card' %}">Inventory</a>
+    </div>
+    <div>
+        {{ market_eval }}
     </div>
     <div class="table_container">
     <table>
         <thead>
         <tr>
             <th>Name</th>
-            <th>Price</th>
+            <th>Bag(s)</th>
+            <th>Profit</th>
         </tr>
         </thead>
-    {% for key, value in market_dict.items %}
+    {% for card in market_dict %}
         <tr>
-            <td>{{ key }}: </td><td>{{ value }}</td>
+            <td>{{ card.name }}</td>
+            <td>{{ card.bags }}</td>
+            <td>{{ card.profit }}</td>
         </tr>
     {% endfor %}
     </table>

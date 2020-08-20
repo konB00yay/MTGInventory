@@ -29,9 +29,25 @@ class Bag(models.Model):
 
 
 class MarketEvaluation(models.Model):
-    time_stamp = models.DateTimeField(blank=False)
-    cards_quantity = models.IntegerField(blank=False)
+    time_stamp = models.DateTimeField(blank=False, primary_key=True)
+    cards_quantity = models.IntegerField(blank=False, default=0)
     card_evaluation = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
-        return self.name
+        if self.card_evaluation == 0:
+            return "Market data collected at: " + str(self.time_stamp)
+        else:
+            return "Evaluation at " + str(self.time_stamp) + " resulted in $" + str(self.card_evaluation)
+
+
+class MarketCard(models.Model):
+    id = models.CharField(max_length=100, primary_key=True, editable=False)
+    evaluation = models.ForeignKey(MarketEvaluation, on_delete=models.CASCADE)
+    market_value = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    bag = models.ManyToManyField(Bag, blank=True)
+
+    def profit(self):
+        profit = 0
+        for b in self.bag.all():
+            profit += b.quantity * self.market_value
+        return profit

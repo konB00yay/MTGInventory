@@ -4,8 +4,8 @@ import re
 
 import requests
 from bs4 import BeautifulSoup
-from itertools import chain
 from django.contrib import messages
+from django.utils import timezone
 from django.db.models import F
 from django.shortcuts import render
 from django.views.generic import TemplateView
@@ -13,7 +13,7 @@ from django_filters import FilterSet
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 
-from .models import Card, Sold, Bag, MarketEvaluation
+from .models import Card, Sold, Bag, MarketEvaluation, MarketCard
 from .tables import CardTable, SoldTable
 
 
@@ -32,6 +32,7 @@ class SetCodes:
         if set_abbrev != '':
             SET_KEYS[set_abbrev] = set_name
             SET_NAMES[set_name] = set_abbrev
+
 
 class CardFilter(FilterSet):
     class Meta:
@@ -80,17 +81,21 @@ class CardTableView(SingleTableMixin, FilterView):
                 bag_id = card_id + '_' + bag
                 _, created = Card.objects.update_or_create(
                     id=card_id,
-                    name=name,
-                    edition=edition,
-                    foil=foil
+                    defaults={
+                        'name': name,
+                        'edition': edition,
+                        'foil': foil
+                    }
                 )
                 bags = Bag.objects.filter(bag_id=bag_id)
                 if bags.count() == 0:
                     Bag.objects.update_or_create(
                         bag_id=bag_id,
-                        card=_,
-                        bag_number=bag,
-                        quantity=quantity
+                        defaults={
+                            'card': _,
+                            'bag_number': bag,
+                            'quantity': quantity
+                        }
                     )
                 else:
                     selected_bag = bags[0]
@@ -147,14 +152,16 @@ class SoldTableView(SingleTableMixin, FilterView):
                     selected_card = card[0]
                     if selected_card_bag.quantity <= int(quantity):
                         selected_card_bag.delete()
-                        #selected_card.delete()
+                        # selected_card.delete()
                     else:
                         selected_card_bag.quantity = F('quantity') - column[3]
                         selected_card_bag.save()
                     _, created = Sold.objects.update_or_create(
                         id=selected_card.id,
-                        quantity=quantity,
-                        profit=column[5]
+                        defaults={
+                            'quantity': quantity,
+                            'profit': column[5]
+                        }
                     )
                     total_profit += column[5]
         context = {'table': Sold.objects.all(), 'total': total_profit}
@@ -163,46 +170,93 @@ class SoldTableView(SingleTableMixin, FilterView):
 
 class MarketAnalysis(TemplateView):
     template_name = 'market.html'
-    market = {}
+
+    def market_dict(self):
+        market_dict = []
+        for market_card in MarketCard.objects.exclude(bag=None):
+            print(market_card)
+            profit = market_card.profit()
+            bags = []
+            for bag in market_card.bag.all():
+                bags.append(bag.bag_number)
+
+            card_entry = {'name': market_card.id, 'bags': bags, 'profit': profit}
+            market_dict.append(card_entry)
+        return market_dict
 
     def get(self, request):
         template = 'market.html'
-        return render(request, template, {'market_dict': MarketAnalysis.market})
+        return render(request, template, {'market_dict': MarketAnalysis.market_dict(self),
+                                          'market_eval': MarketEvaluation.objects.order_by('-time_stamp')
+                      .first().__str__})
 
     def post(self, request):
-        URL = "https://cardkingdom.com/purchasing/mtg_singles?filter%5Bipp%5D=100&filter%5Bsort%5D=name&filter%5Bnonfoil%5D=1&filter%5Bfoil%5D=1"
-        page = requests.get(URL)
-        soup = BeautifulSoup(page.content, 'html.parser')
-        bags = []
-        # pages = soup.find('ul', class_='pagination').find_all('a')
-        # page_list = list(range(1, int(pages[len(pages) - 1].text) + 1))
-        page_list = [1, 2]
-        for p in page_list:
-            cur_loop = {}
-            page_url = 'https://cardkingdom.com/purchasing/mtg_singles?filter%%5Bipp%%5D=100&filter%%5Bsort%%5D=name&filter%%5Bnonfoil%%5D=1&filter%%5Bfoil%%5D=1&page=%s' %(p)
-            next_page = requests.get(page_url)
-            soup = BeautifulSoup(next_page.content, 'html.parser')
-            cards = soup.find_all('div', class_='itemContentWrapper')
-            for card in cards:
-                card_name = re.sub("[\(\[].*?[\)\]]", "", card.find('span', class_='productDetailTitle').text).rstrip()
-                card_edition = re.sub("[\(\[].*?[\)\]]", "",
-                                      card.find('div', class_='productDetailSet').find('a').text).rstrip()
-                card_foil = card.find('div', class_='foil') is not None
-                if "FOIL" in card_edition:
-                    card_foil = 'true'
-                    card_edition = card_edition.replace('FOIL', '').rstrip()
-                card_edition_key = card_edition
-                if card_edition in SetCodes.SET_NAMES.keys():
-                    card_edition_key = SetCodes.SET_NAMES[card_edition]
-                card_profit_dollar = float(card.find('span', class_='sellDollarAmount').text)
-                card_profit_cents = float(card.find('span', class_='sellCentsAmount').text) / 100
-                card_profit = card_profit_dollar + card_profit_cents
-                card_id = card_name + '_' + card_edition_key + '_' + str(int(card_foil == 'true'))
-                cur_loop[card_id] = card_profit
-                MarketAnalysis.market[card_id] = card_profit
-            market_list = list(chain(Bag.objects.filter(card__id__in=list(cur_loop.keys()))))
-            if len(market_list) > 0:
-                bags.append(market_list)
-        print(bags)
-        template = 'market.html'
-        return render(request, template, {'market_dict': MarketAnalysis.market})
+        if 'gather_market_data' in request.POST:
+            # MarketCard.objects.all().delete()
+            print(len(list(MarketCard.objects.all())))
+            URL = "https://cardkingdom.com/purchasing/mtg_singles?filter%5Bipp%5D=100&filter%5Bsort%5D=" \
+                  "name&filter%5Bnonfoil%5D=1&filter%5Bfoil%5D=1"
+            page = requests.get(URL)
+            curr_time = timezone.now()
+            market_eval, created = MarketEvaluation.objects.update_or_create(
+                time_stamp=curr_time
+            )
+            soup = BeautifulSoup(page.content, 'html.parser')
+            bags = []
+            # pages = soup.find('ul', class_='pagination').find_all('a')
+            # page_list = list(range(1, int(pages[len(pages) - 1].text) + 1))
+            page_list = [1, 2]
+            for p in page_list:
+                page_url = 'https://cardkingdom.com/purchasing/mtg_singles?filter%%5Bipp%%5D=100&filter%%5Bsort%%5D=' \
+                           'name&filter%%5Bnonfoil%%5D=1&filter%%5Bfoil%%5D=1&page=%s' % (p)
+                next_page = requests.get(page_url)
+                soup = BeautifulSoup(next_page.content, 'html.parser')
+                cards = soup.find_all('div', class_='itemContentWrapper')
+                for card in cards:
+                    card_name = re.sub("[\(\[].*?[\)\]]", "", card.find('span', class_='productDetailTitle').text) \
+                        .rstrip()
+                    card_edition = re.sub("[\(\[].*?[\)\]]", "",
+                                          card.find('div', class_='productDetailSet').find('a').text).rstrip()
+                    card_foil = card.find('div', class_='foil') is not None
+                    if "FOIL" in card_edition:
+                        card_foil = 'true'
+                        card_edition = card_edition.replace('FOIL', '').rstrip()
+                    card_edition_key = card_edition
+                    if card_edition in SetCodes.SET_NAMES.keys():
+                        card_edition_key = SetCodes.SET_NAMES[card_edition]
+                    card_profit_dollar = float(card.find('span', class_='sellDollarAmount').text)
+                    card_profit_cents = float(card.find('span', class_='sellCentsAmount').text) / 100
+                    card_profit = card_profit_dollar + card_profit_cents
+                    card_id = card_name + '_' + card_edition_key + '_' + str(int(card_foil == 'true'))
+                    curr_market_card, created_card = MarketCard.objects.update_or_create(
+                        id=card_id,
+                        defaults={
+                            'evaluation': market_eval,
+                            'market_value': card_profit
+                        }
+                    )
+            template = 'market.html'
+            return render(request, template, {'market_dict': [], 'market_eval': market_eval.__str__})
+        elif 'apply_market_data' in request.POST:
+            # Need to factor in existing evaluations and resetting bags
+            latest_eval = MarketEvaluation.objects.order_by('-time_stamp').first()
+            if latest_eval.card_evaluation == 0:
+                card_quantity = 0
+                card_eval = 0
+                for market_card in MarketCard.objects.all():
+                    bags = Bag.objects.filter(card__id=market_card.id)
+                    if bags:
+                        market_card.bag.add(*list(bags))
+                        market_card.save()
+                        card_quantity += sum(bags.values_list('quantity', flat=True))
+                        card_eval += market_card.profit()
+                    else:
+                        market_card.bag.set([])
+                        market_card.save()
+                latest_eval.card_evaluation = card_eval
+                latest_eval.cards_quantity = card_quantity
+                latest_eval.save()
+
+            return render(request, self.template_name, {'market_dict': MarketAnalysis.market_dict(self),
+                                                        'market_eval': MarketEvaluation.objects.order_by('-time_stamp')
+                          .first().__str__})
